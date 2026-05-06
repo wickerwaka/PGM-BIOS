@@ -1,0 +1,105 @@
+#ifndef PGM_BIOS_Z80_RAW_FUNCTIONS_H
+#define PGM_BIOS_Z80_RAW_FUNCTIONS_H
+
+#include "pgm_bios_z80_raw_types.h"
+
+/* Generated function forward declarations from Ghidra. */
+
+/* ram:0000 */ void Z80ResetVector(byte startup_a, ushort startup_ix);
+/* ram:0038 */ void Z80IrqVector(void);
+/* ram:0066 */ void Z80NmiVector(byte saved_a, byte entry_flags);
+/* ram:0100 */ void Z80StartupAndJumpMain(byte startup_a, ushort startup_ix);
+/* ram:010b */ void HandleZ80Irq(void);
+/* ram:0128 */ void HandleZ80Nmi(byte saved_a, byte entry_flags);
+/* ram:0142 */ void WriteSoundChipRegisterPair(ushort port, byte value);
+/* ram:0147 */ byte WriteSoundChipRegister(ushort port);
+/* ram:014c */ void FormatFiveByteBcdAscii(byte *src_value, char *dst_ascii);
+/* ram:023e */ byte ScaleByteByRegisterB(byte input_a, ushort value_word, ushort multiplier_word);
+/* ram:0265 */ byte WriteResponseLatchValue(byte response_value);
+/* ram:026f */ ushort ReadSoundLatch0Word(byte register_id);
+/* ram:027b */ void ReadSoundLatch0(byte register_id, byte value);
+/* ram:0285 */ void ReadSoundLatch2Byte(byte register_id, ushort value);
+/* ram:0291 */ void ReadSoundLatch3Byte(byte register_id, byte value);
+/* ram:029a */ byte ReadSoundLatch2(byte register_id);
+/* ram:02a3 */ byte ReadIrqStatusPort(void);
+/* ram:02a9 */ void ReadSoundLatch3(byte value);
+/* ram:02b4 */ void JumpToZ80Reset(byte startup_a, ushort startup_ix);
+/* ram:02b7 */ void Z80WriteLatchOrIo(ushort error_code);
+/* ram:02ed */ void Z80DeadLoopBeforeMain(void);
+/* ram:02ef */ void Z80MainLoop(void);
+/* ram:035b */ void HandleZ80Command00(ushort command_frame);
+/* ram:0a9f */ void HandleZ80Command10(ushort command_frame);
+/* ram:0de6 */ void Z80MainLoopContinue(ushort command_frame);
+/* ram:0df1 */ void CheckResetHandshake(void);
+/* ram:0e34 */ void Poll68kStatusLatch(byte entry_flags);
+/* ram:0e50 */ void SetResponseLatchNibble(byte high_mask, byte low_mask, byte latched_low_bits, byte entry_flags);
+/* ram:0eb9 */ byte DisplaySoundChipDiagnosticMessage(char *message, ushort value, ushort display_flags);
+/* ram:1050 */ byte InitializeSoundChannels(byte voice_slot);
+/* ram:10b9 */ void ProgramSoundChannelRegisters(ushort voice_slot, byte *channel_state, byte *work_buffer, ushort pitch_or_step, byte entry_flags);
+/* ram:1208 */ void ProgramSoundChannelMinimal(ushort voice_slot, ushort sound_id, byte entry_flags);
+/* ram:126e */ void SetSoundChannelWaveIndex(byte voice_slot, ushort wave_index);
+/* ram:12bb */ void ConfigureSoundChipVoiceMode(ushort register_value, ushort mode, byte voice_slot);
+/* ram:139c */ void InitializeVoiceAllocationTable(byte entry_flags);
+/* ram:13ee */ byte AllocateSoundVoiceSlot(byte owner);
+/* ram:1438 */ byte SilenceAllSoundChannels(byte voice_slot);
+/* ram:1449 */ void ReleaseSoundVoiceSlot(byte voice_slot);
+/* ram:1473 */ void ServiceSoundChannels(byte owner);
+/* ram:14b8 */ void InitializeMidiRuntimeGlobals(void);
+/* ram:1519 */ void HandleIrqBit0Service(void);
+/* ram:153b */ void HandleIrqBit1Service(void);
+/* ram:167a */ void VerifySoundChipOrDisplayError(ushort display_flags);
+/* ram:16a0 */ void InitializeSoundChipCore(byte entry_flags);
+/* ram:16f2 */ byte ProbeSoundChipRevision(void);
+/* ram:170b */ byte ReadSoundChipRevisionAfterMagic(byte magic_value);
+/* ram:173b */ void ResetSoundChipMixerState(void);
+/* ram:1785 */ void DisplaySoundChipErrorCode(ushort error_code);
+/* ram:17a6 */ void InitializeSoundChipVoicesAndTables(ushort initial_voice_index, byte entry_flags);
+/* ram:18d3 */ void ClearMidiChannelState(ushort midi_channel);
+/* ram:19c1 */ void InitializeMidiPlaybackState(void);
+/* ram:1a51 */ void ResetMidiChannel(byte midi_channel);
+/* ram:1a8e */ void MarkMidiChannelActive(byte midi_channel);
+/* ram:1aa0 */ void SetMidiChannelParameter(byte midi_channel, byte value);
+/* ram:1abf */ void ScaleMidiChannelVolumeTable(ushort midi_channel, byte scale, byte limit);
+/* ram:1b6d */ byte StartMidiSequence(byte midi_channel, byte sequence_id);
+/* ram:2330 */ void UpdateMidiPlayback(void);
+/* ram:2485 */ void InitializeWaveTableState(void);
+/* ram:24e2 */ byte FindFreeWaveChannel(void);
+/* ram:251c */ byte AllocateWaveChannel(ushort sound_id, ushort wave_index);
+/* ram:2611 */ void StartWaveChannel(ushort sound_id, ushort wave_index, byte flags);
+/* ram:268f */ void StartWaveChannelAbsolute(ushort sound_id, ushort wave_index, ushort flags);
+/* ram:2738 */ void StartWaveChannelRelative(ushort sound_id, ushort wave_index, byte flags);
+/* ram:27f2 */ void RestartWaveChannelByKey(ushort sound_id, ushort wave_index, byte entry_flags);
+/* ram:2878 */ void UpdateWaveChannelByKey(ushort sound_id, ushort wave_index);
+/* ram:28fc */ void StopWaveChannelsBySoundId(ushort sound_id);
+/* ram:2981 */ void StopAllActiveWaveChannels(void);
+/* ram:29e2 */ byte StopWaveChannelForMidi(byte voice_slot, byte midi_channel);
+/* ram:2ab8 */ void StopMatchingWaveChannels(byte mode);
+/* ram:2c7b */ void InitializeCommandStreamState(PgmZ80CommandStreamState *state, byte *buffer, ushort chunk_size);
+/* ram:2d05 */ byte PollOrServiceCommandQueue(PgmZ80CommandStreamState *state);
+/* ram:2d1a */ byte CheckCommandStreamAvailable(PgmZ80CommandStreamState *state, byte entry_flags);
+/* ram:2d5e */ void ReadCommandStreamByte(PgmZ80CommandStreamState *state, ushort count, byte entry_flags);
+/* ram:2e33 */ void DispatchCommandStreamUntilEmpty(byte command, PgmZ80CommandStreamState *state, byte *buffer);
+/* ram:2e55 */ byte DispatchZ80Command(byte command, PgmZ80CommandStreamState *state, byte *buffer);
+/* ram:3042 */ void DelayLoop(byte count);
+/* ram:3050 */ void ClearLocalBuffer(byte *dst, ushort value);
+/* ram:305d */ void LoadCommandBytesToBuffer(byte *dst, ushort value);
+/* ram:3068 */ void MultiplyFourByteValue(byte *dst_product, byte *multiplicand, byte *multiplier, byte entry_flags);
+/* ram:30d7 */ void DivideFourByteValue(byte *result_dst, byte *dividend_or_quotient, byte *divisor, byte entry_flags);
+/* ram:3171 */ byte CompareFourBytes(byte *lhs, byte *rhs);
+/* ram:317f */ ushort CopyBufferToSoundChip(byte *src);
+/* ram:3186 */ void ShiftCopyFourBytes(byte *shift_count_ptr, byte *dst, byte *src);
+/* ram:31a9 */ void PrepareSoundChipWriteBuffer(byte *shift_count_ptr, byte *dst, byte *src);
+/* ram:31d1 */ void AndFourBytes(byte *dst, byte *lhs, byte *rhs);
+/* ram:31e1 */ void OrFourBytes(byte *dst, byte *lhs, byte *rhs);
+/* ram:31f1 */ void JumpTableDispatch(ushort entry_count, byte *table, ushort key);
+/* ram:3213 */ void CopyBytesCounted(byte count, byte *dst, byte *src);
+/* ram:3219 */ void DisableInterruptsWrapper(void);
+/* ram:321b */ void InitializeDriverState(void);
+/* ram:321d */ void CompareBytesForFlags(ushort lhs, ushort rhs);
+/* ram:3223 */ byte CompareSignedHighBytePair(ushort lhs, ushort rhs);
+/* ram:3233 */ byte CompareWordPairForFlags(ushort lhs, ushort rhs);
+/* ram:3245 */ ushort CalculateScaledOffset(ushort index, ushort stride);
+/* ram:3280 */ byte CompareHighByteThenLow(ushort lhs, ushort rhs);
+/* ram:3286 */ void ReturnZeroStub(ushort lhs, ushort rhs);
+
+#endif /* PGM_BIOS_Z80_RAW_FUNCTIONS_H */
