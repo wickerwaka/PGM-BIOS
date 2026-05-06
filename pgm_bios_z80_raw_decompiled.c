@@ -132,36 +132,8 @@ void Z80NmiVector(byte saved_a,byte entry_flags)
 void Z80StartupAndJumpMain(byte startup_a,ushort startup_ix)
 
 {
-  PgmZ80CommandStreamState *pPVar1;
-  ushort uVar2;
-  undefined1 *puVar3;
-  
-  puVar3 = (undefined1 *)0x3ffe;
-  uRam3fdf = 0x2ff;
-  uRam3ffe = startup_ix;
   z80_irq_status_port = startup_a;
-  CheckResetHandshake();
-  uRam3fdf = 0x52;
-  uRam3fdd = 0x312;
-  InitializeMidiPlaybackState();
-  uRam3fdf = 0x31c;
-  InitializeWaveTableState();
-  uRam3fdf = 799;
-  InitializeDriverState();
-  uRam3fdf = 0x329;
-  ClearLocalBuffer((byte *)0x3fe1,0);
-  do {
-    pPVar1 = &z80_primary_command_stream;
-    uRam3fdf = 0x32f;
-    PollOrServiceCommandQueue(&z80_primary_command_stream);
-  } while ((char)((ushort)pPVar1 >> 8) != '\0' || (char)pPVar1 != '\0');
-  uRam3fdf = 0x33f;
-  DispatchZ80Command(0,&z80_primary_command_stream,(byte *)0x3ff7);
-  uRam3fdf = 0x347;
-  uVar2 = CopyBufferToSoundChip((byte *)0x3ff7);
-  puVar3[-8] = (char)uVar2;
-  uRam3fdf = 0xd69;
-  JumpTableDispatch(0x1d,(byte *)(uVar2 & 0xff),0xd72);
+  Z80MainLoop();
   return;
 }
 
@@ -210,11 +182,11 @@ void HandleZ80Nmi(byte saved_a,byte entry_flags)
 
 
 /* ============================================================
- * ram:0142 WriteSoundChipRegisterPair
+ * ram:0142 WritePort
  * ============================================================ */
 
 
-void WriteSoundChipRegisterPair(ushort port,byte value)
+void WritePort(ushort port,byte value)
 
 {
   *(byte *)(port & 0xff) = value;
@@ -225,11 +197,11 @@ void WriteSoundChipRegisterPair(ushort port,byte value)
 
 
 /* ============================================================
- * ram:0147 WriteSoundChipRegister
+ * ram:0147 ReadPort
  * ============================================================ */
 
 
-byte WriteSoundChipRegister(ushort port)
+byte ReadPort(ushort port)
 
 {
   return *(byte *)(port & 0xff);
@@ -379,11 +351,11 @@ byte ScaleByteByRegisterB(byte input_a,ushort value_word,ushort multiplier_word)
 
 
 /* ============================================================
- * ram:0265 WriteResponseLatchValue
+ * ram:0265 ReadICSRegisterHigh
  * ============================================================ */
 
 
-byte WriteResponseLatchValue(byte response_value)
+byte ReadICSRegisterHigh(byte response_value)
 
 {
   bIo0001 = response_value;
@@ -394,11 +366,11 @@ byte WriteResponseLatchValue(byte response_value)
 
 
 /* ============================================================
- * ram:026f ReadSoundLatch0Word
+ * ram:026f ReadICSRegisterWord
  * ============================================================ */
 
 
-ushort ReadSoundLatch0Word(byte register_id)
+ushort ReadICSRegisterWord(byte register_id)
 
 {
   bIo0001 = register_id;
@@ -409,11 +381,11 @@ ushort ReadSoundLatch0Word(byte register_id)
 
 
 /* ============================================================
- * ram:027b ReadSoundLatch0
+ * ram:027b WriteICSRegisterByteHigh
  * ============================================================ */
 
 
-void ReadSoundLatch0(byte register_id,byte value)
+void WriteICSRegisterByteHigh(byte register_id,byte value)
 
 {
   bIo0001 = register_id;
@@ -425,11 +397,11 @@ void ReadSoundLatch0(byte register_id,byte value)
 
 
 /* ============================================================
- * ram:0285 ReadSoundLatch2Byte
+ * ram:0285 WriteICSRegisterWord
  * ============================================================ */
 
 
-void ReadSoundLatch2Byte(byte register_id,ushort value)
+void WriteICSRegisterWord(byte register_id,ushort value)
 
 {
   bIo0001 = register_id;
@@ -441,11 +413,11 @@ void ReadSoundLatch2Byte(byte register_id,ushort value)
 
 
 /* ============================================================
- * ram:0291 ReadSoundLatch3Byte
+ * ram:0291 WriteICSRegisterByteLow
  * ============================================================ */
 
 
-void ReadSoundLatch3Byte(byte register_id,byte value)
+void WriteICSRegisterByteLow(byte register_id,byte value)
 
 {
   bIo0001 = register_id;
@@ -457,11 +429,11 @@ void ReadSoundLatch3Byte(byte register_id,byte value)
 
 
 /* ============================================================
- * ram:029a ReadSoundLatch2
+ * ram:029a ReadICSRegisterByteLow
  * ============================================================ */
 
 
-byte ReadSoundLatch2(byte register_id)
+byte ReadICSRegisterByteLow(byte register_id)
 
 {
   bIo0001 = register_id;
@@ -486,11 +458,11 @@ byte ReadIrqStatusPort(void)
 
 
 /* ============================================================
- * ram:02a9 ReadSoundLatch3
+ * ram:02a9 WriteICSSelectOscillator
  * ============================================================ */
 
 
-void ReadSoundLatch3(byte value)
+void WriteICSSelectOscillator(byte value)
 
 {
   uIo0001 = 0x4f;
@@ -526,8 +498,7 @@ void Z80WriteLatchOrIo(ushort error_code)
 
 {
   z80_soundchip_latch_high_nibble = (byte)error_code;
-  WriteSoundChipRegisterPair
-            (0x8400,z80_soundchip_latch_high_nibble & 0xf0 | z80_soundchip_latch_low_nibble & 0xf);
+  WritePort(0x8400,z80_soundchip_latch_high_nibble & 0xf0 | z80_soundchip_latch_low_nibble & 0xf);
   DisableInterruptsWrapper();
   do {
                     /* WARNING: Do nothing block with infinite loop */
@@ -703,7 +674,7 @@ void CheckResetHandshake(void)
   z80_soundchip_latch_low_nibble = 0;
   z80_soundchip_status_nibble = 0;
   z80_soundchip_latch_high_nibble = 0;
-  WriteSoundChipRegisterPair(0x8400,0);
+  WritePort(0x8400,0);
   InitializeCommandStreamState(&z80_primary_command_stream,z80_primary_command_buffer,0x50);
   return;
 }
@@ -725,8 +696,8 @@ void Poll68kStatusLatch(byte entry_flags)
   
   z80_soundchip_latch_high_nibble = 0xf0;
   bVar1 = entry_flags & 0x28;
-  WriteSoundChipRegisterPair(0x8400,z80_soundchip_latch_low_nibble & 0xf | 0xf0);
-  bVar2 = WriteSoundChipRegister(0x8200);
+  WritePort(0x8400,z80_soundchip_latch_low_nibble & 0xf | 0xf0);
+  bVar2 = ReadPort(0x8200);
   z80_soundchip_status_nibble = bVar2 & 0xf;
   bVar1 = bVar1 & 0x28 | ((z80_soundchip_status_nibble - 1 & 0x10) != 0) << 4 |
           SBORROW1(z80_soundchip_status_nibble,'\x01') << 2 | 2 | z80_soundchip_status_nibble == 0 |
@@ -742,7 +713,7 @@ void Poll68kStatusLatch(byte entry_flags)
     }
   }
   z80_soundchip_latch_high_nibble = 0;
-  WriteSoundChipRegisterPair(0x8400,z80_soundchip_latch_low_nibble & 0xf);
+  WritePort(0x8400,z80_soundchip_latch_low_nibble & 0xf);
   return;
 }
 
@@ -762,8 +733,8 @@ void SetResponseLatchNibble(byte high_mask,byte low_mask,byte latched_low_bits,b
   PgmZ80CommandStreamState *lhs;
   
   bVar1 = entry_flags & 0x28;
-  WriteSoundChipRegisterPair(0x8400,high_mask & low_mask | latched_low_bits);
-  bVar2 = WriteSoundChipRegister(0x8200);
+  WritePort(0x8400,high_mask & low_mask | latched_low_bits);
+  bVar2 = ReadPort(0x8200);
   z80_soundchip_status_nibble = bVar2 & 0xf;
   bVar1 = bVar1 & 0x28 | ((z80_soundchip_status_nibble - 1 & 0x10) != 0) << 4 |
           SBORROW1(z80_soundchip_status_nibble,'\x01') << 2 | 2 | z80_soundchip_status_nibble == 0 |
@@ -779,7 +750,7 @@ void SetResponseLatchNibble(byte high_mask,byte low_mask,byte latched_low_bits,b
     }
   }
   z80_soundchip_latch_high_nibble = 0;
-  WriteSoundChipRegisterPair(0x8400,z80_soundchip_latch_low_nibble & 0xf);
+  WritePort(0x8400,z80_soundchip_latch_low_nibble & 0xf);
   return;
 }
 
@@ -837,7 +808,7 @@ byte DisplaySoundChipDiagnosticMessage(char *message,ushort value,ushort display
   }
   z80_soundchip_latch_low_nibble = 1;
   bVar1 = 0;
-  WriteSoundChipRegisterPair(0x8300,z80_soundchip_latch_high_nibble & 0xf0 | 1);
+  WritePort(0x8300,z80_soundchip_latch_high_nibble & 0xf0 | 1);
   puVar3[-8] = 0;
   puVar3[-7] = 0;
   while (CompareWordPairForFlags(0x32,*(ushort *)(puVar3 + -8)), !(bool)(bVar1 & 1)) {
@@ -846,7 +817,7 @@ byte DisplaySoundChipDiagnosticMessage(char *message,ushort value,ushort display
   puVar3[-8] = 0;
   puVar3[-7] = 0;
   while( true ) {
-    bVar2 = WriteSoundChipRegister(0x8200);
+    bVar2 = ReadPort(0x8200);
     bVar1 = 0;
     if ((bVar2 & 0xf0) == 0) {
       return 0;
@@ -872,22 +843,22 @@ byte InitializeSoundChannels(byte voice_slot)
   byte bVar1;
   byte bVar2;
   
-  ReadSoundLatch3(voice_slot);
-  bVar1 = WriteResponseLatchValue(0xd);
+  WriteICSSelectOscillator(voice_slot);
+  bVar1 = ReadICSRegisterHigh(0xd);
   bVar2 = bVar1 & 0xc3;
   if ((bVar1 & 2) != 0) {
     bVar2 = bVar2 | 1;
   }
-  ReadSoundLatch0(0xd,bVar2);
-  ReadSoundLatch0(7,1);
-  ReadSoundLatch0(8,1);
-  ReadSoundLatch0(0x10,0xf);
+  WriteICSRegisterByteHigh(0xd,bVar2);
+  WriteICSRegisterByteHigh(7,1);
+  WriteICSRegisterByteHigh(8,1);
+  WriteICSRegisterByteHigh(0x10,0xf);
   do {
-    bVar1 = WriteResponseLatchValue(0xd);
+    bVar1 = ReadICSRegisterHigh(0xd);
     bVar2 = bVar1 & 1;
   } while ((bVar1 & 1) == 0);
-  ReadSoundLatch0(0xd,3);
-  ReadSoundLatch0(0,0);
+  WriteICSRegisterByteHigh(0xd,3);
+  WriteICSRegisterByteHigh(0,0);
   return bVar2;
 }
 
@@ -946,43 +917,43 @@ void ProgramSoundChannelRegisters
   pbStack_12 = (byte *)0x10f5;
   DivideFourByteValue((byte *)result_dst,(byte *)result_dst,z80_soundchip_register_work,bVar1);
   puStack_e = (undefined1 *)0x10ff;
-  ReadSoundLatch3(puVar3[-6]);
+  WriteICSSelectOscillator(puVar3[-6]);
   puStack_e = (undefined1 *)0x1107;
   value = CopyBufferToSoundChip((byte *)&uStack_c);
   puStack_e = (undefined1 *)0x110e;
-  ReadSoundLatch2Byte(1,value);
+  WriteICSRegisterWord(1,value);
   puStack_e = (undefined1 *)0x111d;
-  ReadSoundLatch0(0x11,**(byte **)(puVar3 + -4));
+  WriteICSRegisterByteHigh(0x11,**(byte **)(puVar3 + -4));
   if ((puVar3[-2] & 0x40) == 0) {
     puStack_e = (undefined1 *)0x1137;
-    ReadSoundLatch2Byte(0xb,*(ushort *)(*(short *)(puVar3 + -4) + 4));
+    WriteICSRegisterWord(0xb,*(ushort *)(*(short *)(puVar3 + -4) + 4));
     puStack_e = (undefined1 *)0x114a;
-    ReadSoundLatch2Byte(10,*(ushort *)(*(short *)(puVar3 + -4) + 6));
+    WriteICSRegisterWord(10,*(ushort *)(*(short *)(puVar3 + -4) + 6));
   }
   else {
     puStack_e = (undefined1 *)0x115f;
-    ReadSoundLatch2Byte(0xb,*(ushort *)(*(short *)(puVar3 + -4) + 8));
+    WriteICSRegisterWord(0xb,*(ushort *)(*(short *)(puVar3 + -4) + 8));
     puStack_e = (undefined1 *)0x1172;
-    ReadSoundLatch2Byte(10,*(ushort *)(*(short *)(puVar3 + -4) + 10));
+    WriteICSRegisterWord(10,*(ushort *)(*(short *)(puVar3 + -4) + 10));
   }
   puStack_e = (undefined1 *)0x1185;
-  ReadSoundLatch2Byte(3,*(ushort *)(*(short *)(puVar3 + -4) + 4));
+  WriteICSRegisterWord(3,*(ushort *)(*(short *)(puVar3 + -4) + 4));
   puStack_e = (undefined1 *)0x1198;
-  ReadSoundLatch2Byte(2,*(ushort *)(*(short *)(puVar3 + -4) + 6));
+  WriteICSRegisterWord(2,*(ushort *)(*(short *)(puVar3 + -4) + 6));
   puStack_e = (undefined1 *)0x11ab;
-  ReadSoundLatch2Byte(5,*(ushort *)(*(short *)(puVar3 + -4) + 8));
+  WriteICSRegisterWord(5,*(ushort *)(*(short *)(puVar3 + -4) + 8));
   puStack_e = (undefined1 *)0x11be;
-  ReadSoundLatch2Byte(4,*(ushort *)(*(short *)(puVar3 + -4) + 10));
+  WriteICSRegisterWord(4,*(ushort *)(*(short *)(puVar3 + -4) + 10));
   puStack_e = (undefined1 *)0x11d0;
-  ReadSoundLatch0(0xc,z80_voice_pan_table[(byte)puVar3[8]]);
+  WriteICSRegisterByteHigh(0xc,z80_voice_pan_table[(byte)puVar3[8]]);
   puStack_e = (undefined1 *)0x11e3;
-  ReadSoundLatch2Byte(9,z80_wave_frequency_table[(byte)puVar3[6]]);
+  WriteICSRegisterWord(9,z80_wave_frequency_table[(byte)puVar3[6]]);
   puStack_e = (undefined1 *)0x11ee;
-  ReadSoundLatch0(0,puVar3[-2]);
+  WriteICSRegisterByteHigh(0,puVar3[-2]);
   puStack_e = (undefined1 *)0x11f7;
-  ReadSoundLatch0(0xd,3);
+  WriteICSRegisterByteHigh(0xd,3);
   puStack_e = (undefined1 *)0x1200;
-  ReadSoundLatch0(0x10,0);
+  WriteICSRegisterByteHigh(0x10,0);
   return;
 }
 
@@ -1046,11 +1017,11 @@ void ProgramSoundChannelMinimal(ushort voice_slot,ushort sound_id,byte entry_fla
   puStack_c = (undefined1 *)0x124f;
   DivideFourByteValue((byte *)result_dst,(byte *)result_dst,z80_soundchip_register_work,bVar2);
   puStack_c = (undefined1 *)0x1257;
-  ReadSoundLatch3(puVar4[-4]);
+  WriteICSSelectOscillator(puVar4[-4]);
   puStack_c = (undefined1 *)0x125f;
   value = CopyBufferToSoundChip((byte *)&uStack_a);
   puStack_c = (undefined1 *)0x1266;
-  ReadSoundLatch2Byte(1,value);
+  WriteICSRegisterWord(1,value);
   return;
 }
 
@@ -1069,8 +1040,8 @@ void SetSoundChannelWaveIndex(byte voice_slot,ushort wave_index)
   undefined1 auStack_2 [2];
   
   puVar1 = auStack_2;
-  ReadSoundLatch3(voice_slot);
-  ReadSoundLatch2Byte(9,z80_wave_frequency_table[(byte)puVar1[-2]]);
+  WriteICSSelectOscillator(voice_slot);
+  WriteICSRegisterWord(9,z80_wave_frequency_table[(byte)puVar1[-2]]);
   return;
 }
 
@@ -1091,23 +1062,23 @@ void ConfigureSoundChipVoiceMode(ushort register_value,ushort mode,byte voice_sl
   undefined1 local_2 [2];
   
   puVar3 = local_2;
-  bVar2 = ReadSoundLatch2(0x43);
+  bVar2 = ReadICSRegisterByteLow(0x43);
   puVar3[-7] = bVar2;
   bVar2 = (byte)(register_value >> 8);
   if (puVar3[-6] == '\x01') {
-    ReadSoundLatch3Byte(0x40,puVar3[-4]);
-    ReadSoundLatch3Byte(0x42,puVar3[-2]);
+    WriteICSRegisterByteLow(0x40,puVar3[-4]);
+    WriteICSRegisterByteLow(0x42,puVar3[-2]);
     puVar3[-7] = bVar2 | 8;
   }
   else {
-    ReadSoundLatch3Byte(0x41,puVar3[-4]);
+    WriteICSRegisterByteLow(0x41,puVar3[-4]);
     puVar3[-2] = puVar3[-2] * ' ';
     puVar3[-7] = bVar2 & 0x1f;
     bVar1 = puVar3[-2] | bVar2 & 0x1f;
     puVar3[-7] = bVar1;
     puVar3[-7] = bVar1 | 0x10;
   }
-  ReadSoundLatch3Byte(0x43,bVar2);
+  WriteICSRegisterByteLow(0x43,bVar2);
   return;
 }
 
@@ -1269,14 +1240,14 @@ void HandleIrqBit0Service(void)
   byte mode;
   
   mode = 0x43;
-  z80_irq_voice_command_flags = ReadSoundLatch2(0x43);
+  z80_irq_voice_command_flags = ReadICSRegisterByteLow(0x43);
   if ((z80_irq_voice_command_flags & 1) == 0) {
-    ReadSoundLatch2(0x41);
+    ReadICSRegisterByteLow(0x41);
   }
   else {
     UpdateMidiPlayback();
     StopMatchingWaveChannels(mode);
-    ReadSoundLatch2(0x40);
+    ReadICSRegisterByteLow(0x40);
   }
   return;
 }
@@ -1307,7 +1278,7 @@ void HandleIrqBit1Service(void)
   CopyBytesCounted(4,z80_voice_active_mask_a,z80_initial_voice_mask_a);
   while( true ) {
     uStack_2 = 0x1557;
-    bVar1 = WriteResponseLatchValue(0xf);
+    bVar1 = ReadICSRegisterHigh(0xf);
     z80_irq_voice_index = bVar1 & 0x1f;
     z80_irq_voice_command_flags = bVar1 & 0xc0;
     if (z80_irq_voice_command_flags == 0xc0) break;
@@ -1318,7 +1289,7 @@ void HandleIrqBit1Service(void)
     CopyBytesCounted(4,z80_voice_start_mask_work,(byte *)puVar2);
     uVar3 = (ushort)z80_irq_voice_index;
     uStack_2 = 0x15a6;
-    ReadSoundLatch3(z80_irq_voice_index);
+    WriteICSSelectOscillator(z80_irq_voice_index);
     if ((z80_irq_voice_command_flags & 0x40) == 0) {
       puVar2 = &uStack_4;
       uStack_6 = 0x15bf;
@@ -1333,7 +1304,7 @@ void HandleIrqBit1Service(void)
         OrFourBytes(z80_voice_active_mask_a,z80_voice_active_mask_a,z80_voice_start_mask_work);
         uVar3 = 0xd;
         uStack_2 = 0x15dd;
-        z80_soundchip_voice_status = WriteResponseLatchValue(0xd);
+        z80_soundchip_voice_status = ReadICSRegisterHigh(0xd);
         if ((z80_soundchip_voice_status & 8) == 0) {
           uStack_2 = 0x15ed;
           InitializeSoundChannels(z80_irq_voice_index);
@@ -1356,7 +1327,7 @@ void HandleIrqBit1Service(void)
         uStack_2 = 0x1628;
         OrFourBytes(z80_voice_active_mask_b,z80_voice_active_mask_b,z80_voice_start_mask_work);
         uStack_2 = 0x162e;
-        z80_soundchip_voice_status = WriteResponseLatchValue(0);
+        z80_soundchip_voice_status = ReadICSRegisterHigh(0);
         uStack_2 = 0x163a;
         bVar1 = StopWaveChannelForMidi(z80_irq_voice_index,bVar1);
         if ((bVar1 == 0) && ((z80_soundchip_voice_status & 8) == 0)) {
@@ -1425,13 +1396,13 @@ void InitializeSoundChipCore(byte entry_flags)
           (undefined1 *)0xfffe < &local_2;
   local_2._1_1_ = 3;
   initial_voice_index = 0x4c;
-  ReadSoundLatch3Byte(0x4c,3);
+  WriteICSRegisterByteLow(0x4c,3);
   InitializeSoundChipVoicesAndTables(initial_voice_index,bVar1);
-  bVar1 = ReadSoundLatch2(0x4d);
+  bVar1 = ReadICSRegisterByteLow(0x4d);
   local_2 = CONCAT11(local_2._1_1_,bVar1) | 0xc;
-  ReadSoundLatch3Byte(0x4d,bVar1 | 0xc);
+  WriteICSRegisterByteLow(0x4d,bVar1 | 0xc);
   local_2 = CONCAT11(local_2._1_1_,1);
-  ReadSoundLatch3Byte(0x4a,1);
+  WriteICSRegisterByteLow(0x4a,1);
   return;
 }
 
@@ -1448,22 +1419,22 @@ byte ProbeSoundChipRevision(void)
 {
   byte bVar1;
   
-  WriteSoundChipRegisterPair(0x8001,0x5a);
-  bVar1 = WriteSoundChipRegister(0x8001);
+  WritePort(0x8001,0x5a);
+  bVar1 = ReadPort(0x8001);
   if (bVar1 != 0x5a) {
     return 0xff;
   }
-  WriteSoundChipRegisterPair(0x8001,0xa5);
-  bVar1 = WriteSoundChipRegister(0x8001);
+  WritePort(0x8001,0xa5);
+  bVar1 = ReadPort(0x8001);
   if (bVar1 != 0xa5) {
     return 0xff;
   }
-  WriteSoundChipRegisterPair(0x8001,0x4c);
-  bVar1 = WriteSoundChipRegister(0x8001);
+  WritePort(0x8001,0x4c);
+  bVar1 = ReadPort(0x8001);
   if (bVar1 != 0x4c) {
     return 0xff;
   }
-  bVar1 = WriteSoundChipRegister(0x8002);
+  bVar1 = ReadPort(0x8002);
   return bVar1;
 }
 
@@ -1480,17 +1451,17 @@ byte ReadSoundChipRevisionAfterMagic(byte magic_value)
 {
   byte bVar1;
   
-  WriteSoundChipRegisterPair(0x8001,magic_value);
-  bVar1 = WriteSoundChipRegister(0x8001);
+  WritePort(0x8001,magic_value);
+  bVar1 = ReadPort(0x8001);
   if (bVar1 != 0xa5) {
     return 0xff;
   }
-  WriteSoundChipRegisterPair(0x8001,0x4c);
-  bVar1 = WriteSoundChipRegister(0x8001);
+  WritePort(0x8001,0x4c);
+  bVar1 = ReadPort(0x8001);
   if (bVar1 != 0x4c) {
     return 0xff;
   }
-  bVar1 = WriteSoundChipRegister(0x8002);
+  bVar1 = ReadPort(0x8002);
   return bVar1;
 }
 
@@ -1507,11 +1478,11 @@ void ResetSoundChipMixerState(void)
 {
   undefined2 local_2;
   
-  ReadSoundLatch3Byte(0x4d,0);
+  WriteICSRegisterByteLow(0x4d,0);
   for (local_2 = 0x10; local_2._1_1_ != '\0' || (char)local_2 != '\0'; local_2 = local_2 + -1) {
-    ReadSoundLatch2(0x4d);
+    ReadICSRegisterByteLow(0x4d);
   }
-  ReadSoundLatch3Byte(0x4d,1);
+  WriteICSRegisterByteLow(0x4d,1);
   return;
 }
 
@@ -1569,15 +1540,15 @@ void InitializeSoundChipVoicesAndTables(ushort initial_voice_index,byte entry_fl
   uStack_8 = 0x17b6;
   uStack_6 = initial_voice_index;
   uStack_4 = initial_voice_index;
-  bVar4 = ReadSoundLatch2(0x4d);
+  bVar4 = ReadICSRegisterByteLow(0x4d);
   puVar7[-2] = bVar4;
   puVar7[-3] = bVar4;
   bVar3 = bVar3 & 0x28;
   puVar7[-2] = bVar4 & 0xf7;
   uStack_8 = 0x17ca;
-  ReadSoundLatch3Byte(0x4d,bVar4 & 0xf7);
+  WriteICSRegisterByteLow(0x4d,bVar4 & 0xf7);
   uStack_8 = 0x17d3;
-  ReadSoundLatch0(0xe,0x1f);
+  WriteICSRegisterByteHigh(0xe,0x1f);
   puVar7[-4] = 0;
   while( true ) {
     bVar4 = bVar3 & 0x28;
@@ -1592,7 +1563,7 @@ void InitializeSoundChipVoicesAndTables(ushort initial_voice_index,byte entry_fl
     bVar3 = bVar3 & 0x28;
     if (0x1f < (byte)uStack_6) break;
     uStack_8 = 0x180e;
-    ReadSoundLatch3((byte)uStack_6);
+    WriteICSSelectOscillator((byte)uStack_6);
     puVar7[-1] = 0xff;
     bVar4 = bVar3;
     do {
@@ -1605,18 +1576,18 @@ void InitializeSoundChipVoicesAndTables(ushort initial_voice_index,byte entry_fl
         goto LAB_ram_1841;
       }
       uStack_8 = 0x182b;
-      bVar4 = WriteResponseLatchValue(0);
+      bVar4 = ReadICSRegisterHigh(0);
       puVar7[-2] = bVar4;
       bVar4 = bVar3 & 0x28;
     } while ((puVar7[-2] & 0x80) != 0);
     puVar7[-4] = (char)uStack_6 + '\x01';
   }
   uStack_8 = 0x183e;
-  bVar4 = WriteResponseLatchValue(0xf);
+  bVar4 = ReadICSRegisterHigh(0xf);
   puVar7[-2] = bVar4;
 LAB_ram_1841:
   uStack_8 = 0x1847;
-  ReadSoundLatch3(0);
+  WriteICSSelectOscillator(0);
   puVar7[-1] = 0xff;
   do {
     bVar2 = puVar7[-1] - 1;
@@ -1631,23 +1602,23 @@ LAB_ram_1841:
       break;
     }
     uStack_8 = 0x1867;
-    ReadSoundLatch0(0,0xa0);
+    WriteICSRegisterByteHigh(0,0xa0);
     uStack_8 = 0x186d;
-    bVar4 = ReadSoundLatch2(0x4b);
+    bVar4 = ReadICSRegisterByteLow(0x4b);
     puVar7[-2] = bVar4;
     bVar4 = puVar7[-2] & 0x9f;
     bVar3 = bVar3 & 0x28 | SBORROW1(bVar4,-0x80) << 2 | (bVar4 == 0x80) << 6 |
             ((char)(bVar4 + 0x80) < '\0') << 7;
   } while (bVar4 != 0x80);
   uStack_8 = 0x1883;
-  ReadSoundLatch0(0xe,0x1f);
+  WriteICSRegisterByteHigh(0xe,0x1f);
   uStack_8 = 0x188b;
-  ReadSoundLatch0(0,0);
+  WriteICSRegisterByteHigh(0,0);
   uStack_8 = 0x1891;
-  bVar4 = WriteResponseLatchValue(0xf);
+  bVar4 = ReadICSRegisterHigh(0xf);
   puVar7[-2] = bVar4;
   uStack_8 = 0x189f;
-  ReadSoundLatch3Byte(0x4d,(byte)(uStack_6 >> 8));
+  WriteICSRegisterByteLow(0x4d,(byte)(uStack_6 >> 8));
   pbVar6 = abStack_e;
   bVar3 = bVar3 & 0xec;
   pbStack_10 = (byte *)0x18ae;
@@ -2700,17 +2671,17 @@ byte DispatchZ80Command(byte command,PgmZ80CommandStreamState *state,byte *buffe
   bVar3 = (byte)((ushort)state >> 8) | (byte)state;
   if (bVar3 == 0) {
     z80_soundchip_latch_high_nibble = 0xf0;
-    WriteSoundChipRegisterPair(0x8400,z80_soundchip_latch_low_nibble & 0xf | 0xf0);
+    WritePort(0x8400,z80_soundchip_latch_low_nibble & 0xf | 0xf0);
     z80_soundchip_latch_high_nibble = 0xf0;
-    WriteSoundChipRegisterPair(0x8400,z80_soundchip_latch_low_nibble & 0xf | 0xf0);
+    WritePort(0x8400,z80_soundchip_latch_low_nibble & 0xf | 0xf0);
     z80_soundchip_latch_high_nibble = 0xf0;
-    WriteSoundChipRegisterPair(0x8400,z80_soundchip_latch_low_nibble & 0xf | 0xf0);
-    bVar3 = WriteSoundChipRegister(0x8200);
+    WritePort(0x8400,z80_soundchip_latch_low_nibble & 0xf | 0xf0);
+    bVar3 = ReadPort(0x8200);
     puVar5[-7] = bVar3 & 0xf;
     *(short *)(*(short *)(puVar5 + -4) + 0xc) = *(short *)(*(short *)(puVar5 + -4) + 0xc) + -1;
     z80_soundchip_latch_high_nibble = 0;
     bVar3 = 0x40;
-    WriteSoundChipRegisterPair(0x8400,z80_soundchip_latch_low_nibble & 0xf);
+    WritePort(0x8400,z80_soundchip_latch_low_nibble & 0xf);
     z80_command_stream_dispatch_count = z80_command_stream_dispatch_count + 1;
     puVar5[-6] = 0;
     puVar5[-5] = 0;
